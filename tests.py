@@ -114,15 +114,6 @@ class StoreTestCase(unittest.TestCase):
         self.assertIsNone(self.store2.update_summary(self.store2))
 
 
-class GitHubRepositoryTestCase(unittest.TestCase):
-
-    def setUp(self):
-        pass
-
-        def tearDown(self):
-            pass
-
-
 class StorageManagerTestCase(unittest.TestCase):
 
     def run_cmd(self, cmd):
@@ -142,7 +133,6 @@ class StorageManagerTestCase(unittest.TestCase):
     def tearDown(self):
         self.run_cmd("aws s3 rb s3://ccurcanu-dockerfile-test --force")
 
-    @unittest.SkipTest
     def test_object_read(self):
         file_content = self.mngr.read_object(os.path.basename(self.test_file_name))
         self.assertIsNotNone(file_content)
@@ -151,7 +141,6 @@ class StorageManagerTestCase(unittest.TestCase):
         file_content = self.mngr.read_object("non-existing")
         self.assertIsNone(file_content)
 
-    @unittest.SkipTest
     def test_object_write(self):
         write_object_name = "write-object-test.%d" % (os.getpid())
         write_object_name_content = "test file content"
