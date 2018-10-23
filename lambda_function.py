@@ -163,10 +163,6 @@ class Store():
         next_ver = int(self.json[self.dockerfile_repo_name]["version"].strip()) + 1
         self.json[self.dockerfile_repo_name]["version"] = str(next_ver)
 
-    def get_dockerfile_version(self):
-        """ Return version (str) of the dockerfile Github repository. """
-        return self.json[dockerfile_repo_name]["version"]
-
     def github_repo_full_name(self, tool_name):
         """ Get the full name of the repository as it is mentioned in the internal JSON content."""
         if tool_name in self.json:
@@ -183,20 +179,21 @@ class Store():
                 None: if the ```remove_prefix``` is not present in the tool item. """
         if tool_name in self.json:
             if "remove_prefix" in self.json[tool_name]:
-                return self.json[repo_name]["remove_prefix"]
+                return self.json[tool_name]["remove_prefix"]
 
     def force_version(self, tool_name):
         """ Detect if ``force_version`` tag is present in the JSON content entry
             for the tool_name. """
         if tool_name in self.json:
             return "force_version" in self.json[tool_name]
+        return False
 
     def update_summary(self, other_store):
         """ Composes a version update summary (str) comparing current state with
             the state of another similar type object. """
         summary = str()
-        now = datetime.datetime.now().strftime("%Y-%m-%d")
-        headline = "%s changes on:" % now
+        headline = "Changes detected on:"
+        has_changes = False
         for k, v in self.json.items():
             other_ver = other_store.version(k)
             curr_ver = self.version(k)
@@ -204,8 +201,9 @@ class Store():
                 continue
             headline += " %s" % k
             summary += "%s\t\t changed version %s -> %s \n" % (k, other_ver, curr_ver)
-        return headline + '\n' + summary
-
+            has_changes = True
+        if has_changes:
+            return headline + '\n' + summary
 
 def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
     if access_token:
