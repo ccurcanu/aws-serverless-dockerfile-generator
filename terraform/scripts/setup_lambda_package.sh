@@ -3,9 +3,7 @@
 #  Prepare the Lambda function deployment package by installing the dependencies
 # relative to the function. Terraform will build the package zip and will deploy
 # it to AWS.
-#
 ##
-
 
 TMP=/tmp/dockerfilegenerator
 

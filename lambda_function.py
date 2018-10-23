@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import copy
 import datetime
@@ -17,27 +17,65 @@ DOCKERFILE_GITHUB_REPO = os.environ.get("dockerfile_github_repository", None)
 INTERNAL_S3_BUCKET_NAME = os.environ.get("internal_s3_bucket", None)
 INTERNAL_STORE_PATH = "internal/store.json"
 
-
 class GitHubRepository():
+    """ Code repository in GitHub is modeled by this class.
+
+    The __init__ method accepts the following arguments:
+        name (str): Full name of the repository in GitHub (i.e. hashicorp/terraform).
+        access_token (str): GitHub account access token.
+
+    """
 
     def __init__(self, name, access_token):
         self.github = github.Github(access_token)
         self.repo = self.github.get_repo(name)
 
     @property
-    def name(self):
-        return self.repo.name
+    def latest_release_version(self):
+        """ Return latest release version of the GitHub repository.
 
-    @property
-    def latest_version(self):
+        Note:
+            Some GitHub repositories code releases are not convergent with the release processes
+            of the actual product they are offering. As an example, hashicorp/terraform have
+            the GitHub repository in sync with the product releases as mentioned on the
+            official web site, allowing us to use this method reliably, but ansible/ansible is not.
+
+        Returns:
+            Version of the latest relese (str, i.e.: 'v0.11.9'), or None
+
+        """
         releases = [ rel for rel in self.repo.get_releases() if not rel.prerelease ]
         if len(releases):
             return releases[0].tag_name
 
     def get_file_content(self, file_path, ref="master"):
+        """Return the content of the file.
+
+        Args:
+            file_path (str): Path of the file relative to root of the code repository.
+            ref (str): Branch reference that you want to use (default: master)
+
+        Return:
+            Content of the file (str).
+
+        """
         return self.repo.get_file_contents(file_path, ref).decoded_content.decode()
 
     def commit(self, commit_files, commit_msg, branch="heads/master", type="text", mode="100644"):
+        """ Commit a list of files on specified branch.
+
+        Note:
+            At this moment it supports only text file. The full implementation should deal with blobs also.
+            In case of blobs we should also encode the content before adding it to the tree.
+
+        Args:
+            commit_files (list): A list of tuples containing the file name, and file content as str objects.
+            commit_msg (str): Commit message.
+            branch (str): Branch reference where the commit will be added (default: heads/master).
+            type (str): Type of the content (default: 'text'). May be blob, or others also.
+            mode (str): File mode of the commited files (default: '100644').
+
+        """
         index_files = []
         master_ref = self.repo.get_git_ref(branch)
         master_sha = master_ref.object.sha
@@ -53,15 +91,45 @@ class GitHubRepository():
 
 
 class Store():
+    """ Internal JSON file modeled as a store.
+
+    The __init__ method accepts the following arguments:
+        file_content (str): Content of the JSON obj that will be constructed.
+        dockerfile_repo_name (str): Name of the dockerfile GitHub repository.
+
+    Note:
+        The Dockerfile repository (ccurcanu/docker-cloud-tools) has a JSON file located into internal/store.json
+        where internal state is stored. Most important is the versions of each tracked cloud management tool.
+        Other internal state is stored.
+
+    """
 
     def __init__(self, file_content, dockerfile_repo_name=DOCKERFILE_GITHUB_REPO):
         self.json = json.loads(file_content)
         self.dockerfile_repo_name = os.path.basename(dockerfile_repo_name)
 
-    def dumps(self):
+    @property
+    def dump(self):
+        """ Dump of the JSON object as str with visibile identation"""
         return json.dumps(self.json, indent=4)
 
-    def dump_template_variables(self):
+    @property
+    def sha(self):
+        """ SHA256 hash of the internal JSON dump"""
+        content = self.dump.encode("utf-8")
+        return hashlib.sha256(content).hexdigest()
+
+    @property
+    def template_variables(self):
+        """ Return dict used to populate README.md and Dockerfile templates with values.
+
+            Note:
+                keys (str): Are mentioned as template key for each tracked cloud tool in the internal tool.
+                values (str): Values are the versions mentioned in the internal store.
+
+            It will be fed to str().format() method in order to populate the template content with variable.
+
+        """
         template = dict()
         for item in self.json:
             remove_prefix = self.remove_prefix(item)
@@ -71,51 +139,61 @@ class Store():
             template.update({self.json[item]["template_key"]: version})
         return template
 
-    @property
-    def sha(self):
-        content = self.dumps().encode("utf-8")
-        return hashlib.sha256(content).hexdigest()
-
     def equals(self, store):
+        """ Compare two objects and return True if they are having same content."""
         return self.sha == store.sha
 
     def different(self, store):
+        """ Compare two objects, complement of equals method above."""
         return not self.equals(store)
 
-    def version(self, repo_name):
-        if repo_name in self.json:
-            return self.json[repo_name]["version"]
+    def version(self, tool_name):
+        """ Version (str) of the tool, as specified in the internal JSON content."""
+        if tool_name in self.json:
+            return self.json[tool_name]["version"]
 
-    def set_version(self, repo_name, version):
-        if repo_name in self.json:
-            self.json[repo_name]["version"] = version
+    def set_version(self, tool_name, version):
+        if tool_name in self.json:
+            self.json[tool_name]["version"] = version
         else:
-            raise Exception("Error: repo key %s not existing in store" % repo_name)
+            raise Exception("Error: repo key %s not existing in store" % tool_name)
 
     def set_next_version_dockerfile(self):
+        """ Increments the version of the dockerfile repository as specified in internal JSON content"""
         next_ver = int(self.json[self.dockerfile_repo_name]["version"].strip()) + 1
         self.json[self.dockerfile_repo_name]["version"] = str(next_ver)
 
-    def get_dockerfile_version(self):
-        return self.json[dockerfile_repo_name]["version"]
+    def github_repo_full_name(self, tool_name):
+        """ Get the full name of the repository as it is mentioned in the internal JSON content."""
+        if tool_name in self.json:
+            return self.json[tool_name]["github_repo"]
 
-    def github_repo_full_name(self, repo_name):
-        if repo_name in self.json:
-            return self.json[repo_name]["github_repo"]
+    def remove_prefix(self, tool_name):
+        """ Return version str prefix if JSON content entry has ``remove_prefix`` specified.
 
-    def remove_prefix(self, repo_name):
-        if repo_name in self.json:
-            if "remove_prefix" in self.json[repo_name]:
-                return self.json[repo_name]["remove_prefix"]
+            Note:
+                Some tools have versions like 'v0.11.9' (terraform), or "go1.11.1" (go).
 
-    def force_version(self, repo_name):
-        if repo_name in self.json:
-            return "force_version" in self.json[repo_name]
+            Return:
+                prefix (str): Prefix of the version.
+                None: if the ```remove_prefix``` is not present in the tool item. """
+        if tool_name in self.json:
+            if "remove_prefix" in self.json[tool_name]:
+                return self.json[tool_name]["remove_prefix"]
+
+    def force_version(self, tool_name):
+        """ Detect if ``force_version`` tag is present in the JSON content entry
+            for the tool_name. """
+        if tool_name in self.json:
+            return "force_version" in self.json[tool_name]
+        return False
 
     def update_summary(self, other_store):
+        """ Composes a version update summary (str) comparing current state with
+            the state of another similar type object. """
         summary = str()
-        now = datetime.datetime.now().strftime("%Y-%m-%d")
-        headline = "%s changes on:" % now
+        headline = "Changes detected on:"
+        has_changes = False
         for k, v in self.json.items():
             other_ver = other_store.version(k)
             curr_ver = self.version(k)
@@ -123,8 +201,9 @@ class Store():
                 continue
             headline += " %s" % k
             summary += "%s\t\t changed version %s -> %s \n" % (k, other_ver, curr_ver)
-        return headline + '\n' + summary
-
+            has_changes = True
+        if has_changes:
+            return headline + '\n' + summary
 
 def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
     if access_token:
@@ -135,7 +214,12 @@ def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
 
 
 class StorageManager():
+    """ S3 object storage is modelled by this class.
 
+        The __init__ method has the following arguments:
+            bucket_name (str): Name of the bucket
+
+    """
     def __init__(self, bucket_name=INTERNAL_S3_BUCKET_NAME):
         self.bucket_name = bucket_name
         self.s3_resource = boto3.resource("s3")
@@ -153,7 +237,6 @@ class StorageManager():
 
 
 def main():
-
     internal_store = StorageManager()
 
     dockerfile_github = github_repository(DOCKERFILE_GITHUB_REPO)
@@ -162,7 +245,7 @@ def main():
 
     lambda_internal_store = internal_store.read_object(INTERNAL_STORE_PATH)
     if lambda_internal_store is None:
-        content = dockerfile_store.dumps()
+        content = dockerfile_store.dump
         internal_store.write_object(INTERNAL_STORE_PATH, content)
         lambda_store = Store(content)
     else:
@@ -173,22 +256,23 @@ def main():
 
     terraform_github = github_repository(dockerfile_store.github_repo_full_name("terraform"))
     current_terraform_version = dockerfile_store.version("terraform")
-    latest_terraform_version = terraform_github.latest_version
+    latest_terraform_version = terraform_github.latest_release_version
+
     if current_terraform_version != latest_terraform_version:
         dockerfile_store.set_version("terraform", latest_terraform_version)
 
     if dockerfile_store.different(dockerfile_store_orig):
         dockerfile_store.set_next_version_dockerfile()
         commit_msg = dockerfile_store.update_summary(dockerfile_store_orig)
-        template_variables = dockerfile_store.dump_template_variables()
-        store_dump = dockerfile_store.dumps()
+        store_dump = dockerfile_store.dump
         commit_files_dockerfile = [
             ("internal/store.json", store_dump),
-            ("Dockerfile", template_dockerfile.format(**template_variables)),
-            ("README.md", template_readme.format(**template_variables))
+            ("Dockerfile", template_dockerfile.format(**dockerfile_store.template_variables)),
+            ("README.md", template_readme.format(**dockerfile_store.template_variables))
         ]
         dockerfile_github.commit(commit_files_dockerfile, commit_msg)
         internal_store.write_object(INTERNAL_STORE_PATH, store_dump)
+
     return 0
 
 
