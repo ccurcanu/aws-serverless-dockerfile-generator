@@ -2,17 +2,24 @@
 
 import copy
 import os
+import sys
+import shutil
 import subprocess
 import unittest
+
+from unittest import mock
+
+PREV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+sys.path.append(PREV_DIR)
+
 
 from lambda_function import StorageManager, Store, GitHubRepository
 
 import boto3
+import lambda_function
 
-class StoreTestCase(unittest.TestCase):
 
-    def setUp(self):
-        content = """
+JSON_CONTENT = """
 {
     "terraform": {
         "github_repo": "hashicorp/terraform",
@@ -34,10 +41,12 @@ class StoreTestCase(unittest.TestCase):
     }
 }"""
 
-        self.store1 = Store(content, dockerfile_repo_name="docker-cloud-tools")
-        self.store2 = copy.deepcopy(self.store1)
+class StoreTestCase(unittest.TestCase):
 
-        content_store3 = content.replace("v0.11.9", "v0.11.10")
+    def setUp(self):
+        self.store1 = Store(JSON_CONTENT, dockerfile_repo_name="docker-cloud-tools")
+        self.store2 = copy.deepcopy(self.store1)
+        content_store3 = JSON_CONTENT.replace("v0.11.9", "v0.11.10")
         self.store3 = Store(content_store3, dockerfile_repo_name="docker-cloud-tools")
 
     def test_sha(self):
@@ -114,12 +123,15 @@ class StoreTestCase(unittest.TestCase):
         self.assertIsNone(self.store2.update_summary(self.store2))
 
 
-class StorageManagerTestCase(unittest.TestCase):
+class TestsMixin():
 
-    def run_cmd(self, cmd):
-        proc = subprocess.Popen(cmd.split())
+    def run_cmd(self, cmd, cwd=None, environ=os.environ):
+        proc = subprocess.Popen(cmd.split(), cwd=cwd)
         proc.wait()
         return proc.returncode
+
+
+class StorageManagerTestCase(unittest.TestCase, TestsMixin):
 
     def setUp(self):
         self.bucket_name = "ccurcanu-dockerfile-test"
@@ -133,6 +145,7 @@ class StorageManagerTestCase(unittest.TestCase):
     def tearDown(self):
         self.run_cmd("aws s3 rb s3://ccurcanu-dockerfile-test --force")
 
+    @unittest.SkipTest
     def test_object_read(self):
         file_content = self.mngr.read_object(os.path.basename(self.test_file_name))
         self.assertIsNotNone(file_content)
@@ -141,6 +154,7 @@ class StorageManagerTestCase(unittest.TestCase):
         file_content = self.mngr.read_object("non-existing")
         self.assertIsNone(file_content)
 
+    @unittest.SkipTest
     def test_object_write(self):
         write_object_name = "write-object-test.%d" % (os.getpid())
         write_object_name_content = "test file content"
@@ -149,6 +163,48 @@ class StorageManagerTestCase(unittest.TestCase):
         with open("/tmp/%s" % write_object_name, "r") as fd:
             content = fd.read()
             self.assertEquals(content, "test file content")
+
+
+class LambdaFunctionTestCase(unittest.TestCase, TestsMixin):
+
+
+    def setUp(self):
+        # Setup the internal store S3 bucket and content
+        self.bucket_name = "ccurcanu-dockerfile-test%s" % os.getpid()
+        self.test_file_name = "internal/store.json"
+        self.mngr = StorageManager(bucket_name=self.bucket_name)
+        self.run_cmd("aws s3 mb s3://%s --region eu-west-2" % self.bucket_name)
+        self.mngr.write_object("internal/store.json", JSON_CONTENT)
+        # Setup the master branch on github repository
+        self.dockerfile_repo = "ccurcanu/dockerfile-generator-testing"
+        self.dockerfile_repo_url = "git@github.com:%s.git" % self.dockerfile_repo
+        self.clone_dir = os.path.join(os.sep, "tmp", os.path.basename(self.dockerfile_repo))
+        if os.path.exists(self.clone_dir):
+            print("Removing %s ..." % self.clone_dir)
+            shutil.rmtree(self.clone_dir)
+        self.run_cmd("git clone %s %s" % (self.dockerfile_repo_url, self.clone_dir))
+
+    def test_terraform_upgrade_by_hashicorp_release(self):
+        self.run_cmd("git branch master test-terraform-upgrade -f -q", cwd=self.clone_dir)
+        self.run_cmd("git checkout master -q", cwd=self.clone_dir)
+        self.run_cmd("git pull origin master -q ", cwd=self.clone_dir)
+        self.run_cmd("git push origin master -q", cwd=self.clone_dir)
+        context = { "terraform_version": "vXX.YY.ZZ"}
+        try:
+            environ = dict()
+            environ.update({"internal_s3_bucket": self.bucket_name})
+            environ.update({"github_access_token": os.environ.get("github_access_token")})
+            environ.update({"dockerfile_github_repository": os.environ.get("dockerfile_github_repository")})
+            with mock.patch.dict("os.environ", environ):
+                retcode = lambda_function.lambda_handler(None, context, is_testing_env=True)
+        except lambda_function.LambdaException as e:
+            self.fail(str(e))
+        self.assertEqual(retcode, 0)
+
+    def tearDown(self):
+        self.run_cmd("aws s3 rb s3://%s --force" % self.bucket_name)
+
+
 
 
 if __name__ == '__main__':

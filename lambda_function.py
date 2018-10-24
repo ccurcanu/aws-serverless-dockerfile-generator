@@ -14,8 +14,8 @@ import github
 
 GITHUB_ACCESS_TOKEN = os.environ.get("github_access_token", None)
 DOCKERFILE_GITHUB_REPO = os.environ.get("dockerfile_github_repository", None)
-INTERNAL_S3_BUCKET_NAME = os.environ.get("internal_s3_bucket", None)
 INTERNAL_STORE_PATH = "internal/store.json"
+
 
 class GitHubRepository():
     """ Code repository in GitHub is modeled by this class.
@@ -205,13 +205,6 @@ class Store():
         if has_changes:
             return headline + '\n' + summary
 
-def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
-    if access_token:
-        return GitHubRepository(name, access_token)
-    else:
-        raise Exception("Error: Could not create '%s' repo obj as the github access token is empty" % name)
-
-
 
 class StorageManager():
     """ S3 object storage is modelled by this class.
@@ -220,7 +213,7 @@ class StorageManager():
             bucket_name (str): Name of the bucket
 
     """
-    def __init__(self, bucket_name=INTERNAL_S3_BUCKET_NAME):
+    def __init__(self, bucket_name):
         self.bucket_name = bucket_name
         self.s3_resource = boto3.resource("s3")
 
@@ -236,34 +229,55 @@ class StorageManager():
         file_obj.put(Body=content.encode("utf-8"))
 
 
-def main():
-    internal_store = StorageManager()
+class LambdaException(Exception):
+    """ Will used this to handle exceptions. """
+
+    pass
+
+
+def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
+    try:
+        return GitHubRepository(name, access_token)
+    except Exception as e: # @TODO: Please remove Exception
+        raise LambdaException("Error: GitHubRepository('%s'): %s" % \
+                (name, str(e)))
+
+
+def main(context, is_testing_env=False):
+
+    bucket_name = os.environ.get("internal_s3_bucket", None)
+    if bucket_name is None:
+        raise LambdaException("Error: internal_s3_bucket is env variable not set.")
+
+    storage_mngr = StorageManager(bucket_name=)
+    lambda_store_content = storage_mngr.read_object(INTERNAL_STORE_PATH)
 
     dockerfile_github = github_repository(DOCKERFILE_GITHUB_REPO)
-    dockerfile_store = Store(dockerfile_github.get_file_content(INTERNAL_STORE_PATH))
+    store_content = dockerfile_github.get_file_content(INTERNAL_STORE_PATH)
+    dockerfile_store = Store(store_content)
     dockerfile_store_orig = copy.deepcopy(dockerfile_store)
+    terraform_github = github_repository(dockerfile_store.github_repo_full_name("terraform"))
 
-    lambda_internal_store = internal_store.read_object(INTERNAL_STORE_PATH)
-    if lambda_internal_store is None:
+    if lambda_store_content is None:
         content = dockerfile_store.dump
-        internal_store.write_object(INTERNAL_STORE_PATH, content)
+        storage_mngr.write_object(INTERNAL_STORE_PATH, content)
         lambda_store = Store(content)
     else:
-        lambda_store = Store(lambda_internal_store)
+        lambda_store = Store(lambda_store_content)
 
-    template_readme = dockerfile_github.get_file_content("templates/README.md")
-    template_dockerfile = dockerfile_github.get_file_content("templates/Dockerfile")
+    curr_tf_ver = dockerfile_store.version("terraform")
+    new_tf_ver = terraform_github.latest_release_version
+    if is_testing_env:
+        new_tf_ver = context.get("terraform_version", None)
+    force_tf_ver = dockerfile_store.force_version("terraform")
+    if curr_tf_ver != new_tf_ver and (not force_tf_ver):
+        dockerfile_store.set_version("terraform", new_tf_ver)
 
-    terraform_github = github_repository(dockerfile_store.github_repo_full_name("terraform"))
-    current_terraform_version = dockerfile_store.version("terraform")
-    latest_terraform_version = terraform_github.latest_release_version
-
-    if current_terraform_version != latest_terraform_version:
-        dockerfile_store.set_version("terraform", latest_terraform_version)
-
-    if dockerfile_store.different(dockerfile_store_orig):
+    if dockerfile_store.different(lambda_store):
         dockerfile_store.set_next_version_dockerfile()
-        commit_msg = dockerfile_store.update_summary(dockerfile_store_orig)
+        template_readme = dockerfile_github.get_file_content("templates/README.md")
+        template_dockerfile = dockerfile_github.get_file_content("templates/Dockerfile")
+        commit_msg = dockerfile_store.update_summary(lambda_store)
         store_dump = dockerfile_store.dump
         commit_files_dockerfile = [
             ("internal/store.json", store_dump),
@@ -271,10 +285,13 @@ def main():
             ("README.md", template_readme.format(**dockerfile_store.template_variables))
         ]
         dockerfile_github.commit(commit_files_dockerfile, commit_msg)
-        internal_store.write_object(INTERNAL_STORE_PATH, store_dump)
+        try:
+            storage_mngr.write_object(INTERNAL_STORE_PATH, store_dump)
+        except botocore.exceptions.ClientError as e:
+            raise LambdaException("Error: Uploading object to s3 bucket: %s" % (str(e)))
 
     return 0
 
 
-def lambda_handler(event, context):
-	return main()
+def lambda_handler(event, context, is_testing_env=False):
+	return main(context, is_testing_env=is_testing_env)
