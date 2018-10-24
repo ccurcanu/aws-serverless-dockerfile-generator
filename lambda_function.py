@@ -247,9 +247,9 @@ def main(context, is_testing_env=False):
 
     bucket_name = os.environ.get("internal_s3_bucket", None)
     if bucket_name is None:
-        raise LambdaException("Error: internal_s3_bucket is env variable not set.")
+        raise LambdaException("Error: internal_s3_bucket env variable not set.")
 
-    storage_mngr = StorageManager(bucket_name=)
+    storage_mngr = StorageManager(bucket_name=bucket_name)
     lambda_store_content = storage_mngr.read_object(INTERNAL_STORE_PATH)
 
     dockerfile_github = github_repository(DOCKERFILE_GITHUB_REPO)
