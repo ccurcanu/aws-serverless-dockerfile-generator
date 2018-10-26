@@ -30,7 +30,6 @@ class GitHubRepository():
         self.github = github.Github(access_token)
         self.repo = self.github.get_repo(name)
 
-    @property
     def latest_release_version(self):
         """ Return latest release version of the GitHub repository.
 
@@ -243,7 +242,7 @@ def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
                 (name, str(e)))
 
 
-def main(context, is_testing_env=False):
+def main():
 
     bucket_name = os.environ.get("internal_s3_bucket", None)
     if bucket_name is None:
@@ -266,9 +265,7 @@ def main(context, is_testing_env=False):
         lambda_store = Store(lambda_store_content)
 
     curr_tf_ver = dockerfile_store.version("terraform")
-    new_tf_ver = terraform_github.latest_release_version
-    if is_testing_env:
-        new_tf_ver = context.get("terraform_version", None)
+    new_tf_ver = terraform_github.latest_release_version()
     force_tf_ver = dockerfile_store.force_version("terraform")
     if curr_tf_ver != new_tf_ver and (not force_tf_ver):
         dockerfile_store.set_version("terraform", new_tf_ver)
@@ -293,5 +290,5 @@ def main(context, is_testing_env=False):
     return 0
 
 
-def lambda_handler(event, context, is_testing_env=False):
-	return main(context, is_testing_env=is_testing_env)
+def lambda_handler(event, context):
+	return main()
