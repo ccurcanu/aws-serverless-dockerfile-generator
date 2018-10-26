@@ -100,7 +100,7 @@ data "archive_file" "lambda_zip" {
 
 
 resource "aws_lambda_function" "this" {
-    depends_on        = ["null_resource.prepare-lambda-zip"]
+    depends_on        = ["null_resource.prepare-lambda-zip", "aws_iam_role.this"]
     filename          = "/tmp/dockerfilegenerator.zip"
     function_name     = "DockerfileGenerator"
     role              = "${aws_iam_role.this.arn}"
@@ -119,14 +119,16 @@ resource "aws_lambda_function" "this" {
 
 
 resource "aws_cloudwatch_event_rule" "this" {
-    description = "CloudWatch Events Periodic Trigger for Dockerfile Generator Lambda "
-    name = "cloudwatch-event-schedule-rule"
-    schedule_expression = "rate(5 minutes)"
-    is_enabled = "${var.enable_periodic_trigger}"
+  depends_on = ["aws_lambda_function.this"]
+  description = "CloudWatch Events Periodic Trigger for Dockerfile Generator Lambda "
+  name = "cloudwatch-event-schedule-rule"
+  schedule_expression = "rate(5 minutes)"
+  is_enabled = "${var.enable_periodic_trigger}"
 }
 
 
 resource "aws_cloudwatch_event_target" "this" {
+  depends_on = ["aws_lambda_function.this"]
   rule = "${aws_cloudwatch_event_rule.this.name}"
   target_id = "InvokeLambda"
   arn = "${aws_lambda_function.this.arn}"
@@ -134,6 +136,7 @@ resource "aws_cloudwatch_event_target" "this" {
 
 
 resource "aws_lambda_permission" "scheduled_lambda_cloudwatch_permission" {
+  depends_on = ["aws_lambda_function.this"]
   statement_id = "AllowExecutionFromCloudWatch"
   action = "lambda:InvokeFunction"
   function_name = "${aws_lambda_function.this.arn}"
