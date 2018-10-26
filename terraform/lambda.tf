@@ -113,7 +113,6 @@ resource "aws_lambda_function" "this" {
          github_access_token = "${var.github_access_token}"
          dockerfile_github_repository = "${var.dockerfile_github_repository}"
          internal_s3_bucket = "${var.internal_store_s3_bucket_name}"
-         terraform_version = "v0.11.102"
        }
     }
 }
