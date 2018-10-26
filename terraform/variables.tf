@@ -3,7 +3,7 @@ variable "region" {
 }
 
 variable "enable_periodic_trigger" {
-  default = false
+  default = true
 }
 
 variable "internal_store_s3_bucket_name" {
