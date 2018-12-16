@@ -10,11 +10,15 @@ import json
 
 import boto3
 import botocore.exceptions
+import certifi
+import urllib3
 import github
 
 GITHUB_ACCESS_TOKEN = os.environ.get("github_access_token", None)
 DOCKERFILE_GITHUB_REPO = os.environ.get("dockerfile_github_repository", None)
 INTERNAL_STORE_PATH = "internal/store.json"
+TF_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/terraform"
+PK_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/packer"
 
 
 class GitHubRepository():
@@ -242,8 +246,28 @@ def github_repository(name, access_token=GITHUB_ACCESS_TOKEN):
                 (name, str(e)))
 
 
-def main():
+def get_hashicorp_api_response_item(url, item):
+    http = urllib3.PoolManager(cert_reqs='CERT_REQUIRED',
+        ca_certs=certifi.where())
+    response = http.request("GET", url)
+    if response.status != 200:
+        raise Exception("Error: GET %d, %s" % (response.status, url))
+    json_data = json.loads(response.data)
+    del http
+    if item in json_data:
+        return json_data[item]
+    raise Exception("Error: item '%s' not in %s" % (item, json.dumps(json_data)))
 
+
+def get_latest_hashicorp_terraform_version():
+    return 'v' + get_hashicorp_api_response_item(TF_LATEST_URL, "current_version")
+
+
+def get_latest_hashicorp_packer_version():
+    return 'v' + get_hashicorp_api_response_item(PK_LATEST_URL, "current_version")
+
+
+def main():
     bucket_name = os.environ.get("internal_s3_bucket", None)
     if bucket_name is None:
         raise LambdaException("Error: internal_s3_bucket env variable not set.")
@@ -264,11 +288,22 @@ def main():
     else:
         lambda_store = Store(lambda_store_content)
 
-    curr_tf_ver = dockerfile_store.version("terraform")
-    new_tf_ver = terraform_github.latest_release_version()
-    force_tf_ver = dockerfile_store.force_version("terraform")
-    if curr_tf_ver != new_tf_ver and (not force_tf_ver):
-        dockerfile_store.set_version("terraform", new_tf_ver)
+
+    curr_tools_versions = {
+        "terraform": dockerfile_store.version("terraform"),
+        "packer": dockerfile_store.version("packer")
+    }
+
+    next_tools_versions = {
+        "terraform": get_latest_hashicorp_terraform_version(),
+        "packer": get_latest_hashicorp_packer_version()
+    }
+
+    for tool in curr_tools_versions:
+        if curr_tools_versions[tool] != next_tools_versions[tool]:
+            if dockerfile_store.force_version(tool):
+                continue
+            dockerfile_store.set_version(tool, next_tools_versions[tool])
 
     if dockerfile_store.different(lambda_store):
         dockerfile_store.set_next_version_dockerfile()

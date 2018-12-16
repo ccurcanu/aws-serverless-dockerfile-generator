@@ -183,7 +183,7 @@ JSON_CONTENT_WITHOUT_FORCE_TEMPLATE ="""
 
   "packer": {{
     "github_repo": "hashicorp/packer",
-    "version": "v1.3.1",
+    "version": "{PK_VERSION}",
     "template_key": "PACKER_VERSION",
     "remove_prefix": "v"
   }},
@@ -277,61 +277,66 @@ class LambdaFunctionTestCase(unittest.TestCase, TestsMixin):
 
     def test_terraform_upgrade_by_hashicorp_release(self):
         self.setup_dockerfile_test_repo(self.clone_dir, "test-terraform-upgrade")
-        initial_values = { "TF_VERSION": "v0.11.8", "DOCKERFILE_VERSION": "1"}
+        initial_values = { "TF_VERSION": "v0.11.8", "DOCKERFILE_VERSION": "1", "PK_VERSION": "v1.3.2" }
         self.mngr.write_object(self.internal_store_path, JSON_CONTENT_WITHOUT_FORCE_TEMPLATE.format(**initial_values))
         try:
             with mock.patch.dict("os.environ", self.environ):
-                expected_new_tf_ver = "vXX.YY.ZZ"
+                expected_new_tfpk_ver = "vXX.YY.ZZ"
                 expected_dockerfile_ver = "2"
                 dockerfile_repo_name = os.environ.get("dockerfile_github_repository")
                 github_access_token = os.environ.get("github_access_token")
                 dockerfile_repo = GitHubRepository(dockerfile_repo_name, github_access_token)
-                with mock.patch.object(lambda_function.GitHubRepository, "latest_release_version", return_value=expected_new_tf_ver) :
-                    retcode = lambda_function.lambda_handler(None, None)
-                    self.assertEqual(retcode, 0)
-                    expected_values = { "TF_VERSION": expected_new_tf_ver, "DOCKERFILE_VERSION": expected_dockerfile_ver}
-                    expected_store_content = JSON_CONTENT_WITHOUT_FORCE_TEMPLATE.format(**expected_values)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
-                    self.assertTrue(store_github.equals(store_s3))
-                    self.assertTrue(store_github.equals(store_expected))
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    # run the lambda function again with the same version of tf
-                    retcode = lambda_function.lambda_handler(None, None)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    # version and Dockerfile has not been changed ...
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    self.assertTrue(store_github.equals(store_expected))
-                expected_new_tf_ver = "vAA.BB.CC"
+                with mock.patch("lambda_function.get_latest_hashicorp_terraform_version", return_value=expected_new_tfpk_ver) :
+                    with mock.patch("lambda_function.get_latest_hashicorp_packer_version", return_value=expected_new_tfpk_ver):
+                        retcode = lambda_function.lambda_handler(None, None)
+                        self.assertEqual(retcode, 0)
+                        expected_values = {"TF_VERSION": expected_new_tfpk_ver, "DOCKERFILE_VERSION": expected_dockerfile_ver, "PK_VERSION": expected_new_tfpk_ver}
+                        expected_store_content = JSON_CONTENT_WITHOUT_FORCE_TEMPLATE.format(**expected_values)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
+                        self.assertTrue(store_github.equals(store_s3))
+                        self.assertTrue(store_github.equals(store_expected))
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        # run the lambda function again with the same version of tf
+                        retcode = lambda_function.lambda_handler(None, None)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        # version and Dockerfile has not been changed ...
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        self.assertTrue(store_github.equals(store_expected))
+                expected_new_tfpk_ver = "vAA.BB.CC"
                 expected_dockerfile_ver = "3"
-                with mock.patch.object(lambda_function.GitHubRepository, "latest_release_version", return_value=expected_new_tf_ver) :
-                    retcode = lambda_function.lambda_handler(None, None)
-                    self.assertEqual(retcode, 0)
-                    expected_values = { "TF_VERSION": expected_new_tf_ver, "DOCKERFILE_VERSION": expected_dockerfile_ver}
-                    expected_store_content = JSON_CONTENT_WITHOUT_FORCE_TEMPLATE.format(**expected_values)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
-                    self.assertTrue(store_github.equals(store_s3))
-                    self.assertTrue(store_github.equals(store_expected))
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    # run the lambda function again with the same version of tf
-                    retcode = lambda_function.lambda_handler(None, None)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    # version and Dockerfile has not been changed ...
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    self.assertTrue(store_github.equals(store_expected))
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                with mock.patch("lambda_function.get_latest_hashicorp_terraform_version", return_value=expected_new_tfpk_ver) :
+                    with mock.patch("lambda_function.get_latest_hashicorp_packer_version", return_value=expected_new_tfpk_ver):
+                        retcode = lambda_function.lambda_handler(None, None)
+                        self.assertEqual(retcode, 0)
+                        expected_values = {"TF_VERSION": expected_new_tfpk_ver, "DOCKERFILE_VERSION": expected_dockerfile_ver, "PK_VERSION": expected_new_tfpk_ver}
+                        expected_store_content = JSON_CONTENT_WITHOUT_FORCE_TEMPLATE.format(**expected_values)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
+                        self.assertTrue(store_github.equals(store_s3))
+                        self.assertTrue(store_github.equals(store_expected))
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        # run the lambda function again with the same version of tf
+                        retcode = lambda_function.lambda_handler(None, None)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        # version and Dockerfile has not been changed ...
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        self.assertTrue(store_github.equals(store_expected))
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
         except lambda_function.LambdaException as e:
             self.fail(str(e))
 
     def test_terraform_upgrade_by_force_version(self):
         expected_new_tf_ver = "vx.y.z" # the one from github...
         expected_dockerfile_ver = "1"
-        initial_values = { "TF_VERSION": expected_new_tf_ver, "DOCKERFILE_VERSION": expected_dockerfile_ver}
+        initial_values = {
+            "TF_VERSION": expected_new_tf_ver,
+            "DOCKERFILE_VERSION": expected_dockerfile_ver,
+            "PK_VERSION": expected_new_tf_ver } # Same like TF in this case
         expected_store_content = JSON_CONTENT_WITH_FORCE_TEMPLATE.format(**initial_values)
         self.mngr.write_object(self.internal_store_path, expected_store_content)
         self.setup_dockerfile_test_repo(self.clone_dir, "test-terraform-upgrade-force", default=False)
@@ -340,23 +345,24 @@ class LambdaFunctionTestCase(unittest.TestCase, TestsMixin):
                 dockerfile_repo_name = os.environ.get("dockerfile_github_repository")
                 github_access_token = os.environ.get("github_access_token")
                 dockerfile_repo = GitHubRepository(dockerfile_repo_name, github_access_token)
-                with mock.patch.object(lambda_function.GitHubRepository, "latest_release_version", return_value="whatever") :
-                    retcode = lambda_function.lambda_handler(None, None)
-                    self.assertEqual(retcode, 0)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
-                    self.assertTrue(store_github.equals(store_s3))
-                    self.assertTrue(store_github.equals(store_expected))
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    # run the lambda function again with the same version of tf
-                    retcode = lambda_function.lambda_handler(None, None)
-                    self.assertEqual(retcode, 0)
-                    store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
-                    # version and Dockerfile has not been changed ...
-                    self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
-                    self.assertTrue(store_github.equals(store_expected))
+                with mock.patch("lambda_function.get_latest_hashicorp_terraform_version", return_value="whatever"):
+                    with mock.patch("lambda_function.get_latest_hashicorp_packer_version", return_value="vxx.yy.zz"):
+                        retcode = lambda_function.lambda_handler(None, None)
+                        self.assertEqual(retcode, 0)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_expected = Store(expected_store_content, dockerfile_repo_name=dockerfile_repo_name)
+                        self.assertTrue(store_github.equals(store_s3))
+                        self.assertTrue(store_github.equals(store_expected))
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        # run the lambda function again with the same version of tf
+                        retcode = lambda_function.lambda_handler(None, None)
+                        self.assertEqual(retcode, 0)
+                        store_s3 = Store(self.mngr.read_object(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        store_github = Store(dockerfile_repo.get_file_content(self.internal_store_path), dockerfile_repo_name=dockerfile_repo_name)
+                        # version and Dockerfile has not been changed ...
+                        self.assertTrue(store_github.version(os.path.basename(dockerfile_repo_name)), expected_dockerfile_ver)
+                        self.assertTrue(store_github.equals(store_expected))
         except lambda_function.LambdaException as e:
             self.fail(str(e))
         self.assertEqual(retcode, 0)

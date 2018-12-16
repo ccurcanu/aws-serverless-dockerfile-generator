@@ -1,2 +1,4 @@
 pygithub
 boto3
+urllib3
+certifi
