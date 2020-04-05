@@ -122,16 +122,16 @@ class Store():
         with the state of another similar type object. """
 
         changes = self._get_changed_versions(other_store)
-        headline = "Changes detected on:" + ','.join(changes.keys())
-        summary = "\nVersions:"
+        headline = "\nChanges detected on: " + ', '.join(changes.keys()) + "\n"
+        summary = "Versions:\n"
         for tool_name in changes:
-            summary += "%s\t\t\t%s -> %s" % (
-                changes[tool_name][0], changes[tool_name][1])
+            summary += 4 * " " + "* %s (% s -> % s)\n" % (
+                tool_name, changes[tool_name][0], changes[tool_name][1])
         return headline + "\n" + summary
 
     def _get_changed_versions(self, other_store):
         changes = collections.OrderedDict()
-        for tool_name in self.json.items():
+        for tool_name in self.json:
             old_ver = other_store.version(tool_name)
             new_ver = self.version(tool_name)
             if old_ver == new_ver:

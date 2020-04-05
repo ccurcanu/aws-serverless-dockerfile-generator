@@ -2,11 +2,11 @@
 
 import botocore.exceptions
 
-import src.constants as constants
-import src.exceptions as exceptions
-import src.jsonstore as jsonstore
-import src.s3store as s3store
-import src.github as github
+import lib.constants as constants
+import lib.exceptions as exceptions
+import lib.jsonstore as jsonstore
+import lib.s3store as s3store
+import lib.github as github
 
 
 def get_lambda_internal_known_state(s3_bucket, dockerfile_github):

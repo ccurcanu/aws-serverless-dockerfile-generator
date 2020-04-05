@@ -5,18 +5,18 @@ import unittest
 
 import constants
 
-from .src.jsonstore import Store
+from dockerfilegenerator.lib import jsonstore
 
 
 class StoreTestCase(unittest.TestCase):
 
     def setUp(self):
         self.store1 = jsonstore.Store(
-            constants.JSON_CONTENT, dockerfile_repo_name="docker-cloud-tools")
+            constants.JSON_CONTENT, "docker-cloud-tools")
         self.store2 = copy.deepcopy(self.store1)
         content_store3 = constants.JSON_CONTENT.replace("v0.11.9", "v0.11.10")
         self.store3 = jsonstore.Store(
-            content_store3, dockerfile_repo_name="docker-cloud-tools")
+            content_store3, "docker-cloud-tools")
 
     def test_sha(self):
         self.assertEqual(self.store1.sha, self.store2.sha)
@@ -24,7 +24,7 @@ class StoreTestCase(unittest.TestCase):
 
     def test_dump(self):
         self.assertIsInstance(constants.TEST_STORE_DUMP_EXPECTED, str)
-        self.assertEquals(constants.TEST_STORE_DUMP_EXPECTED, self.store1.dump)
+        self.assertEqual(constants.TEST_STORE_DUMP_EXPECTED, self.store1.dump)
 
     def test_template_variables(self):
         t_var = self.store1.template_variables
@@ -68,11 +68,11 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store1.version("docker-cloud-tools"), "4")
 
     def test_get_github_repo_full_name(self):
-        self.assertEqual(self.store1.github_repo_full_name(
+        self.assertEqual(self.store1.github_repo_name(
             "terraform"), "hashicorp/terraform")
-        self.assertEqual(self.store1.github_repo_full_name(
+        self.assertEqual(self.store1.github_repo_name(
             "packer"), "hashicorp/packer")
-        self.assertEqual(self.store1.github_repo_full_name(
+        self.assertEqual(self.store1.github_repo_name(
             "docker-cloud-tools"), "ccurcanu/docker-cloud-tools")
 
     def test_remove_prefix(self):
@@ -91,7 +91,6 @@ class StoreTestCase(unittest.TestCase):
         self.store2.set_version("docker-cloud-tools", "2")
         self.assertEqual(self.store2.update_summary(
             self.store1), constants.TEST_STORE_UPDATE_SUMMARY)
-        self.assertIsNone(self.store2.update_summary(self.store2))
 
 
 # class TestsMixin():
