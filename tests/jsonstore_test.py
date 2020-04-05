@@ -64,6 +64,9 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store1.version("packer"), "v1.3.1")
         self.assertEqual(self.store1.version("docker-cloud-tools"), "1")
 
+    def test_version_not_found(self):
+        self.assertIsNone(self.store1.version("unknownTool"))
+
     def test_set_version(self):
         self.assertEqual(self.store3.version("terraform"), "v0.11.10")
         self.store3.set_version("terraform", "v0.11.11")
@@ -74,6 +77,10 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store3.version("docker-cloud-tools"), "1")
         self.store3.set_version("docker-cloud-tools", "2")
         self.assertEqual(self.store3.version("docker-cloud-tools"), "2")
+
+    def test_set_version_unknown(self):
+        with self.assertRaises(Exception):
+            self.store3.set_version("UnknownTool", "someversion")
 
     def test_set_next_version_dockerfile(self):
         self.assertEqual(self.store1.version("docker-cloud-tools"), "1")
@@ -91,10 +98,16 @@ class StoreTestCase(unittest.TestCase):
         self.assertEqual(self.store1.github_repo_name(
             "docker-cloud-tools"), "ccurcanu/docker-cloud-tools")
 
+    def test_get_github_repo_full_name_unknown_tool(self):
+        self.assertIsNone(self.store1.github_repo_name("UnknownTool"))
+
     def test_remove_prefix(self):
         self.assertEqual(self.store1.remove_prefix("terraform"), "v")
         self.assertIsNone(self.store1.remove_prefix("docker-cloud-tools"))
         self.assertEqual(self.store1.remove_prefix("packer"), "v")
+
+    def test_remove_prefix_unknown_tool(self):
+        self.assertIsNone(self.store1.remove_prefix("unknownTool"))
 
     def test_force_version(self):
         self.assertTrue(self.store1.force_version("terraform"))
@@ -107,3 +120,6 @@ class StoreTestCase(unittest.TestCase):
         self.store2.set_version("docker-cloud-tools", "2")
         self.assertEqual(self.store2.update_summary(
             self.store1), constants.TEST_STORE_UPDATE_SUMMARY)
+
+    def test_update_summary_nothing_changes(self):
+        self.assertIsNone(self.store2.update_summary(self.store1))

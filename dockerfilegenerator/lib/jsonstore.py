@@ -124,6 +124,8 @@ class Store():
         with the state of another similar type object. """
 
         changes = self._get_changed_versions(other_store)
+        if not changes:
+            return
         headline = "\nChanges detected on: " + ', '.join(changes.keys()) + "\n"
         summary = "Versions:\n"
         for tool_name in changes:
