@@ -1,8 +1,3 @@
-import os
-
-PROJECT_FOLDER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC_FOLDER = os.path.join(PROJECT_FOLDER, "src")
-
 
 JSON_CONTENT = """
 {
