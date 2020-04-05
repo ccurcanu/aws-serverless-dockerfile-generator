@@ -71,3 +71,5 @@ Versions:
     * packer (v1.3.1 -> v1.3.2)
     * docker-cloud-tools (1 -> 2)
 """
+
+TEST_OBJECT_READ_S3_CONTENT = "Content from S3"

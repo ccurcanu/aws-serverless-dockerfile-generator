@@ -4,9 +4,17 @@ import botocore.exceptions
 
 import lib.constants as constants
 import lib.exceptions as exceptions
+import lib.versions as versions
 import lib.jsonstore as jsonstore
 import lib.s3store as s3store
 import lib.github as github
+
+
+TRACKED_TOOLS_NEXT_VERSIONS = {
+    "terraform": versions.get_latest_hashicorp_terraform_version(),
+    "packer": versions.get_latest_hashicorp_packer_version(),
+    "go": versions.get_latest_golang_go_version()
+}
 
 
 def get_lambda_internal_known_state(s3_bucket, dockerfile_github):
@@ -25,7 +33,7 @@ def get_tools_current_version(dockerfile):
 
 def update_dockerfile_store_versions(dockerfile):
     current_versions = get_tools_current_version(dockerfile)
-    next_versions = constants.TRACKED_TOOLS_NEXT_VERSIONS
+    next_versions = TRACKED_TOOLS_NEXT_VERSIONS
     dockerfile_changed = False
     for tool in current_versions:
         if current_versions[tool] != next_versions[tool]:

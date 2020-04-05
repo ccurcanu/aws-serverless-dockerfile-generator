@@ -3,8 +3,8 @@
 import boto3
 import botocore.exceptions
 
-import constants
-import exceptions
+import dockerfilegenerator.lib.constants as constants
+import dockerfilegenerator.lib.exceptions as exceptions
 
 
 class StorageManager():
@@ -23,7 +23,7 @@ class StorageManager():
         try:
             file_obj = self.s3_resource.Object(self.bucket_name, file_name)
             return file_obj.get()["Body"].read().decode()
-        except botocore.exceptions.ClientError:
+        except (botocore.exceptions.ClientError, Exception):
             return
 
     def write_object(self, file_name, content):
@@ -31,9 +31,8 @@ class StorageManager():
         file_obj.put(Body=content.encode("utf-8"))
 
 
-def get_s3_bucket_manager():
-    bucket_name = constants.S3_BUCKET_NAME
-    if bucket_name is None:
+def get_s3_bucket_manager(bucket_name=constants.S3_BUCKET_NAME):
+    if not bucket_name:
         raise exceptions.LambdaException(
             "Error: '%s' lambda env variable not set." %
             constants.LAMBDA_S3_NAME_PARAMETER)

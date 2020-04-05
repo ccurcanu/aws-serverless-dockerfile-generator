@@ -4,8 +4,7 @@ import certifi
 import urllib3
 import json
 
-TF_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/terraform"
-PK_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/packer"
+from dockerfilegenerator.lib.constants import TF_LATEST_URL, PK_LATEST_URL
 
 
 def get_latest_hashicorp_terraform_version():

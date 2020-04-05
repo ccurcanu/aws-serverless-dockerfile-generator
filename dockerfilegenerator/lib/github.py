@@ -2,8 +2,8 @@
 
 import github
 
-import constants
-import exceptions
+import dockerfilegenerator.lib.constants as constants
+import dockerfilegenerator.lib.exceptions as exceptions
 
 
 class GitHubRepository():
@@ -19,6 +19,7 @@ class GitHubRepository():
     def __init__(self, name, access_token):
         self.github = github.Github(access_token)
         self.repo = self.github.get_repo(name)
+        self.name = name
 
     def latest_release_version(self):
         """ Return latest release version of the GitHub repository.

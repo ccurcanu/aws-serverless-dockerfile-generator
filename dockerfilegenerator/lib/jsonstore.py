@@ -5,7 +5,9 @@ import os
 import hashlib
 import json
 
-import constants
+import dockerfilegenerator.lib.constants as constants
+
+print(constants.__file__)
 
 
 class Store():
@@ -27,7 +29,7 @@ class Store():
 
     """
 
-    def __init__(self, content, repo_name):
+    def __init__(self, content, repo_name=constants.DOCKERFILE_GITHUB_REPO):
         self.json = json.loads(content)
         self.dockerfile_repo_name = os.path.basename(repo_name)
 
@@ -143,4 +145,4 @@ class Store():
 def get_dockerfile(repo):
     return Store(
         repo.get_dockerfile_content(),
-        constants.DOCKERFILE_GITHUB_REPO)
+        repo.name)
