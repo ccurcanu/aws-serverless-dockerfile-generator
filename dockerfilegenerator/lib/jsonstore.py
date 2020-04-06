@@ -7,8 +7,6 @@ import json
 
 import dockerfilegenerator.lib.constants as constants
 
-print(constants.__file__)
-
 
 class Store():
     """ Internal JSON file modeled as a store.

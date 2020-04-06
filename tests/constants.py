@@ -73,3 +73,5 @@ Versions:
 """
 
 TEST_OBJECT_READ_S3_CONTENT = "Content from S3"
+
+TEST_GITHUB_GET_FILE_CONTENTS = "Some fake content from GitHub"

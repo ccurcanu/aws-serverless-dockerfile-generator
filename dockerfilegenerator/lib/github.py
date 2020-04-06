@@ -6,7 +6,7 @@ import dockerfilegenerator.lib.constants as constants
 import dockerfilegenerator.lib.exceptions as exceptions
 
 
-class GitHubRepository():
+class GitHubRepository:
     """ Code repository in GitHub is modeled by this class.
 
     The __init__ method accepts the following arguments:
@@ -35,12 +35,13 @@ class GitHubRepository():
         Returns:
             Version of the latest relese (str, i.e.: 'v0.11.9'), or None"""
 
-        releases = [rel for rel in self.repo.get_releases()
-                    if not rel.prerelease]
+        releases = [
+            rel for rel in self.repo.get_releases()
+            if not rel.prerelease]
         if len(releases):
             return releases[0].tag_name
 
-    def get_file_content(self, file_rel_path, ref="master"):
+    def get_file_contents(self, file_rel_path, ref="master"):
         """Return the content of the file in a GitHub repository.
 
         Parameters:
@@ -49,16 +50,13 @@ class GitHubRepository():
 
         Return:
             Content of the file (str)."""
-        return self._get_repo_file_content(file_rel_path, ref)
-
-    def _get_repo_file_content(self, file_path, ref):
-        """ Helper private method to decode file content fron remote repo """
-        content = self.repo.get_file_contents(file_path, ref)
+        content = self.repo.get_file_contents(file_rel_path, ref)
         return content.decoded_content.decode()
 
     def commit(self,
                commit_files,
-               commit_msg, branch="heads/master",
+               commit_msg,
+               branch="heads/master",
                type="text",
                mode="100644"):
         """
@@ -90,15 +88,7 @@ class GitHubRepository():
 
 def get_github_repository(name, access_token=constants.GITHUB_ACCESS_TOKEN):
     try:
-        return github.GitHubRepository(name, access_token)
+        return GitHubRepository(name, access_token)
     except Exception as e:
         raise exceptions.LambdaException(
             "Error: GitHubRepository('%s'): %s" % (name, str(e)))
-
-
-def get_dockerfile_github_repository():
-    return get_github_repository(constants.DOCKERFILE_GITHUB_REPO)
-
-
-def get_dockerfile_content(repo=get_dockerfile_github_repository()):
-    return repo.get_file_content(constants.INTERNAL_STORE_PATH)

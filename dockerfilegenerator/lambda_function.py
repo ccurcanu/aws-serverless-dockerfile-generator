@@ -46,9 +46,9 @@ def update_dockerfile_store_versions(dockerfile):
 
 
 def update_files_on_github(repo, dockerfile, prev_dockerfile):
-    template_dockerfile = repo.get_file_content(
+    template_dockerfile = repo.get_file_contents(
         constants.TEMPLATE_GITHUB_DOCKERFILE_PATH)
-    template_readme = repo.get_file_content(
+    template_readme = repo.get_file_contents(
         constants.TEMPLATE_GITHUB_README_PATH)
     commit_msg = dockerfile.update_summary(prev_dockerfile)
     commit_files = [
@@ -71,7 +71,8 @@ def save_state_to_s3(bucket, dockerfile_store_content):
 
 def main():
         s3_bucket = s3store.get_s3_bucket_manager()
-        dockerfile_repo = github.get_dockerfile_github_repository()
+        dockerfile_repo = github.get_github_repository(
+            constants.DOCKERFILE_GITHUB_REPO)
         dockerfile = jsonstore.get_dockerfile(dockerfile_repo)
         lambda_known_dockerfile_state = get_lambda_internal_known_state(
             s3_bucket, dockerfile)
