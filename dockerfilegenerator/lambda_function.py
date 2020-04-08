@@ -16,18 +16,26 @@ TRACKED_TOOLS_NEXT_VERSIONS = {
 }
 
 
-def get_lambda_internal_known_state(s3_bucket, dockerfile_github):
-    internal_state = s3_bucket.read_object(constants.INTERNAL_STATE_FILE)
+def save_state_to_s3(bucket, dockerfile_store_content):
+    try:
+        bucket.write_object(
+            constants.INTERNAL_STATE_FILE, dockerfile_store_content)
+    except botocore.exceptions.ClientError as e:
+        raise exceptions.LambdaException(
+            "Error: Uploading object to s3 bucket: %s" % (str(e)))
+
+
+def get_internal_known_state(bucket, dockerfile_github):
+    internal_state = bucket.read_object(constants.INTERNAL_STATE_FILE)
     if internal_state is None:
-        content = dockerfile_github.dump
-        s3_bucket.write_object(constants.INTERNAL_STATE_FILE, content)
-        return jsonstore.Store(content)
+        internal_state = dockerfile_github.dump
+        save_state_to_s3(bucket, internal_state)
     return jsonstore.Store(internal_state)
 
 
 def get_tools_current_version(dockerfile):
     return {(tool_name, dockerfile.version(tool_name))
-            for tool_name in constants.TRACKED_TOOLS_NAMES}
+            for tool_name in dockerfile.dump}
 
 
 def update_dockerfile_store_versions(dockerfile):
@@ -35,6 +43,8 @@ def update_dockerfile_store_versions(dockerfile):
     next_versions = TRACKED_TOOLS_NEXT_VERSIONS
     dockerfile_changed = False
     for tool in current_versions:
+        if next_versions.get(tool, None) is None:
+            continue
         if current_versions[tool] != next_versions[tool]:
             if dockerfile.force_version(tool):
                 continue
@@ -59,29 +69,20 @@ def update_files_on_github(repo, dockerfile, prev_dockerfile):
     repo.commit(commit_files, commit_msg)
 
 
-def save_state_to_s3(bucket, dockerfile_store_content):
-    try:
-        bucket.write_object(
-            constants.INTERNAL_STATE_FILE, dockerfile_store_content)
-    except botocore.exceptions.ClientError as e:
-        raise exceptions.LambdaException(
-            "Error: Uploading object to s3 bucket: %s" % (str(e)))
-
-
 def main():
-        s3_bucket = s3store.get_s3_bucket_manager()
+        bucket = s3store.get_bucket_manager()
         dockerfile_repo = github.get_github_repository(
             constants.DOCKERFILE_GITHUB_REPO)
         dockerfile = jsonstore.get_dockerfile(dockerfile_repo)
-        lambda_known_dockerfile_state = get_lambda_internal_known_state(
-            s3_bucket, dockerfile)
+        lambda_known_dockerfile_state = get_internal_known_state(
+            bucket, dockerfile)
         update_dockerfile_store_versions(dockerfile)
         if dockerfile.different(lambda_known_dockerfile_state):
             update_files_on_github(
                 dockerfile_repo,
                 dockerfile,
                 lambda_known_dockerfile_state)
-        save_state_to_s3(s3_bucket, dockerfile.dump)
+            save_state_to_s3(bucket, dockerfile.dump)
         return 0
 
 

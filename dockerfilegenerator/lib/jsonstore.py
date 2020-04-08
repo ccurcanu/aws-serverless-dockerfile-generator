@@ -38,9 +38,7 @@ class Store():
 
     @property
     def sha(self):
-        """ SHA256 hash of the internal JSON dump"""
-        content = self.dump.encode("utf-8")
-        return hashlib.sha256(content).hexdigest()
+        return hashlib.sha256(self.dump.encode("utf-8")).hexdigest()
 
     @property
     def template_variables(self):
