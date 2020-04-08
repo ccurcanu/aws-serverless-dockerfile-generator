@@ -127,7 +127,7 @@ class Store():
         headline = "\nChanges detected on: " + ', '.join(changes.keys()) + "\n"
         summary = "Versions:\n"
         for tool_name in changes:
-            summary += 4 * " " + "* %s (% s -> % s)\n" % (
+            summary += 4 * " " + "* %s (%s -> %s)\n" % (
                 tool_name, changes[tool_name][0], changes[tool_name][1])
         return headline + "\n" + summary
 

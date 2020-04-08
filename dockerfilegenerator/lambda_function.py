@@ -13,7 +13,6 @@ import lib.github as github
 TRACKED_TOOLS_NEXT_VERSIONS = {
     "terraform": versions.get_latest_hashicorp_terraform_version(),
     "packer": versions.get_latest_hashicorp_packer_version(),
-    "go": versions.get_latest_golang_go_version()
 }
 
 

@@ -123,3 +123,7 @@ class StoreTestCase(unittest.TestCase):
 
     def test_update_summary_nothing_changes(self):
         self.assertIsNone(self.store2.update_summary(self.store1))
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
