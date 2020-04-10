@@ -71,3 +71,77 @@ TEST_VERSIONS_GET_API_ITEM_RESPONSE_JSON = """
     "alerts": []
 }
 """ % TEST_HASHICORP_TF_VERSION
+
+
+S3STORE_MNGR_NAME = "dockerfilegenerator.lib.s3store.get_s3_bucket_manager"
+GITHUB_REPO_NAME = "dockerfilegenerator.lib.github.GitHubRepository"
+TRACKED_TOOLS_NAME = "dockerfilegenerator.generator.TRACKED_TOOLS"
+
+
+EXPECTED_TOOLS_CURRENT_VERSION = {
+    'terraform': 'v0.11.9',
+    'packer': 'v1.3.1',
+    'docker-cloud-tools': '1'}
+
+
+EXPECTED_TOOLS_NEXT_VERSION = {
+    'terraform': 'v1.0.0',
+    'packer': 'v1.0.0'}
+
+
+EXPECTED_TEST_UPDATE_DOCKERFILE = """{
+    "terraform": {
+        "github_repo": "hashicorp/terraform",
+        "version": "v0.11.9",
+        "template_key": "TERRAFORM_VERSION",
+        "remove_prefix": "v",
+        "force_version": "true"
+    },
+    "packer": {
+        "github_repo": "hashicorp/packer",
+        "version": "v1.0.0",
+        "template_key": "PACKER_VERSION",
+        "remove_prefix": "v"
+    },
+    "docker-cloud-tools": {
+        "github_repo": "ccurcanu/docker-cloud-tools",
+        "version": "2",
+        "template_key": "DOCKERFILE_VERSION"
+    }
+}"""
+
+JSON_CONTENT_TESTING_UTILS_NO_TRACKED_TOOL = """
+{
+    "sometool": {
+        "github_repo": "sometool",
+        "version": "v0.0.1",
+        "template_key": "SOMEKEY",
+        "remove_prefix": "v"
+    }
+}"""
+
+
+JSON_CONTENT_TESTING_UTILS_NO_UPDATES = """
+{
+    "terraform": {
+        "github_repo": "hashicorp/terraform",
+        "version": "v1.0.0",
+        "template_key": "TERRAFORM_VERSION",
+        "remove_prefix": "v"
+    },
+    "packer": {
+        "github_repo": "hashicorp/packer",
+        "version": "v1.0.0",
+        "template_key": "PACKER_VERSION",
+        "remove_prefix": "v"
+
+    },
+    "docker-cloud-tools": {
+        "github_repo": "ccurcanu/docker-cloud-tools",
+        "version": "1",
+        "template_key": "DOCKERFILE_VERSION"
+    }
+}"""
+
+
+EXPECTED_TEST_UPDATE_DOCKERFILE_FORCE_VERSION = ""

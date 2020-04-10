@@ -4,23 +4,16 @@ import copy
 import unittest
 
 import constants
+import mocks
 
 from dockerfilegenerator.lib import jsonstore
-
-
-class FakeGitHubRepository:
-
-    def __init__(self, name):
-        self.name = name
-
-    def get_dockerfile_content(self):
-        return constants.JSON_CONTENT
 
 
 class StoreUtilsTestCase(unittest.TestCase):
 
     def test_get_dockerfile(self):
-        dockerfile = jsonstore.get_dockerfile(FakeGitHubRepository("reponame"))
+        dockerfile = jsonstore.get_dockerfile(
+            mocks.FakeGitHubRepository("reponame"))
         self.assertIsInstance(dockerfile, jsonstore.Store)
 
 

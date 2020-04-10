@@ -142,5 +142,4 @@ class Store():
 
 def get_dockerfile(repo):
     return Store(
-        repo.get_dockerfile_content(),
-        repo.name)
+        repo.get_file_contents(constants.INTERNAL_STATE_FILE), repo.name)
