@@ -1,31 +1,63 @@
 # -*- coding: utf-8 -*-
 
 import copy
+import os
 import unittest
 import unittest.mock as mock
 
-import dockerfilegenerator.lib.jsonstore as jsonstore
-import dockerfilegenerator.generator as generator
+import dockerfilegenerator.lib.exceptions as exceptions
 
 import constants
-import mocks
 
 
-class GeneratorUtilsTestCase(unittest.TestCase):
+ENVIRON_PATCH = {
+    "dockerfile_gihub_repository": "something/docker-cloud-tools",
+    "github_access_token": "<sometoken>",
+    "internal_s3_bucket":  "<bucketname>"
+}
 
-    def setUp(self):
+with mock.patch.dict(os.environ, ENVIRON_PATCH):
+    import mocks
+    from dockerfilegenerator.lib import jsonstore
+    from dockerfilegenerator import generator
+
+
+class TestsMixin:
+
+    @mock.patch.dict(os.environ, ENVIRON_PATCH)
+    def _init_generator(self,
+                        storage_manager_return_read_none=False,
+                        storage_manager_raise_exception_when_write=False):
         with mock.patch(constants.S3STORE_MNGR_NAME) as s3_bucket_mngr:
-            s3_bucket_mngr.return_value = None
+            storage_manager = mocks.FakeStorageManager("bucketname")
+            storage_manager.read_return_none = storage_manager_return_read_none
+            storage_manager.raise_exception = \
+                storage_manager_raise_exception_when_write
+            s3_bucket_mngr.return_value = storage_manager
             with mock.patch(constants.GITHUB_REPO_NAME) as github_repo:
                 github_repo.return_value = mocks.FakeGitHubRepository(
                     "docker-cloud-tools")
                 self.generator = generator.DockerfileGeneratorLambda()
-        self.generator.dockerfile = jsonstore.Store(
-            constants.JSON_CONTENT, "docker-cloud-tools")
         self.mockTrackedTools = {
             "terraform": self._get_version,
             "packer": self._get_version}
         generator.TRACKED_TOOLS = self.mockTrackedTools
+
+    def _update_dockerfile_versions(self, dockerfile_content):
+        self.generator.dockerfile = jsonstore.Store(
+            dockerfile_content, "docker-cloud-tools")
+        original_dockerfile = copy.deepcopy(self.generator.dockerfile)
+        self.generator.update_dockerfile_versions()
+        return original_dockerfile
+
+    def _get_version(self, version="v1.0.0"):
+        return version
+
+
+class GeneratorUtilsTestCase(unittest.TestCase, TestsMixin):
+
+    def setUp(self):
+        self._init_generator()
 
     def test_tools_current_versions(self):
         self.assertFalse(hasattr(self.generator, "_tools_current_versions"))
@@ -48,7 +80,6 @@ class GeneratorUtilsTestCase(unittest.TestCase):
 
     def test_update_dockerfile_versions(self):
         original_dockerfile = copy.deepcopy(self.generator.dockerfile)
-        generator.TRACKED_TOOLS = self.mockTrackedTools
         self.generator.update_dockerfile_versions()
         self.assertTrue(
             self.generator.dockerfile.different(original_dockerfile))
@@ -56,31 +87,63 @@ class GeneratorUtilsTestCase(unittest.TestCase):
                          constants.EXPECTED_TEST_UPDATE_DOCKERFILE)
 
     def test_update_dockerfile_versions_no_tracked_tool(self):
-        self.generator.dockerfile = jsonstore.Store(
-            constants.JSON_CONTENT_TESTING_UTILS_NO_TRACKED_TOOL,
-            "docker-cloud-tools")
-        original_dockerfile = copy.deepcopy(self.generator.dockerfile)
-        self.generator.update_dockerfile_versions()
+        original_dockerfile = self._update_dockerfile_versions(
+            constants.JSON_CONTENT_TESTING_UTILS_NO_TRACKED_TOOL)
         self.assertFalse(
             self.generator.dockerfile.different(original_dockerfile))
 
     def test_update_dockerfile_versions_force_version(self):
-        self.generator.dockerfile = jsonstore.Store(
-            constants.JSON_CONTENT_TESTING_UTILS_NO_UPDATES,
-            "docker-cloud-tools")
-        original_dockerfile = copy.deepcopy(self.generator.dockerfile)
-        self.generator.update_dockerfile_versions()
+        original_dockerfile = self._update_dockerfile_versions(
+            constants.JSON_CONTENT_TESTING_UTILS_NO_UPDATES)
         self.assertFalse(
             self.generator.dockerfile.different(original_dockerfile))
 
-    def _get_version(self, version="v1.0.0"):
-        return version
 
+class DockerfileGeneratorLambdaTestCase(unittest.TestCase, TestsMixin):
 
-# class DockerfileGeneratorLambdaTestCase(unittest.TestCase):
-#
-#     def setUp(self):
-#         pass
+    def setUp(self):
+        self._init_generator()
+
+    def test_internal_state(self):
+        self.assertIsNone(self.generator._internal_state)
+        state = self.generator.internal_state
+        self.assertIsInstance(state, jsonstore.Store)
+        self.assertEqual(state.dump, constants.TEST_STORE_DUMP_EXPECTED)
+        self.assertEqual(self.generator._internal_state, state)
+        new_state_obj = self.generator.internal_state
+        self.assertEqual(state, new_state_obj)
+
+    def test_internal_state_with_s3_failure(self):
+        self._init_generator(storage_manager_return_read_none=True)
+        self.assertIsNone(self.generator.s3bucket.file_name_written)
+        state = self.generator.internal_state
+        self.assertIsInstance(state, jsonstore.Store)
+        self.assertIsNotNone(self.generator.s3bucket.file_name_written)
+
+    def test_commit(self):
+        self.assertFalse(self.generator.dockerfile_repo.commit_called)
+        self.generator.update_files_on_github()
+        self.assertTrue(self.generator.dockerfile_repo.commit_called)
+
+    def test_save_state_to_s3(self):
+        self._init_generator(storage_manager_raise_exception_when_write=True)
+        with self.assertRaises(exceptions.LambdaException):
+            self.generator.save_state_to_s3("something")
+
+    def test_main(self):
+        self.assertFalse(self.generator.dockerfile_repo.commit_called)
+        self.assertIsNone(self.generator.s3bucket.file_name_written)
+        self.assertEqual(self.generator.main(), 0)
+        self.assertTrue(self.generator.dockerfile_repo.commit_called)
+        self.assertIsNotNone(self.generator.s3bucket.file_name_written)
+
+    @mock.patch(constants.S3STORE_MNGR_NAME)
+    @mock.patch(constants.GITHUB_REPO_NAME)
+    def test_lambda_handler(self, github_repo, s3_bucket_mngr):
+        s3_bucket_mngr.return_value = mocks.FakeStorageManager("bucketname")
+        github_repo.return_value = mocks.FakeGitHubRepository(
+            "docker-cloud-tools")
+        self.assertEqual(generator.lambda_handler(None, None), 0)
 
 
 if __name__ == '__main__':

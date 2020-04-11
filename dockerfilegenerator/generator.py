@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import copy
 import botocore.exceptions
 
 import dockerfilegenerator.lib.constants as constants
@@ -56,6 +57,7 @@ class UtilsMixin:
             dockerfile_changed = True
         if dockerfile_changed:
             self.dockerfile.set_next_version_dockerfile()
+        return dockerfile_changed
 
 
 class DockerfileGeneratorLambda(UtilsMixin):
@@ -78,7 +80,7 @@ class DockerfileGeneratorLambda(UtilsMixin):
             if internal_state is None:
                 internal_state = self.dockerfile.dump
                 self.save_state_to_s3(internal_state)
-        self._internal_state = jsonstore.Store(internal_state)
+            self._internal_state = jsonstore.Store(internal_state)
         return self._internal_state
 
     def update_files_on_github(self):
@@ -98,13 +100,12 @@ class DockerfileGeneratorLambda(UtilsMixin):
     def save_state_to_s3(self, content):
         try:
             self.s3bucket.write_object(constants.INTERNAL_STATE_FILE, content)
-        except botocore.exceptions.ClientError as e:
+        except (botocore.exceptions.ClientError, Exception) as e:
             raise exceptions.LambdaException(
                 "Error: Uploading object to s3 bucket: %s" % (str(e)))
 
     def main(self):
-        self.update_dockerfile_versions()
-        if self.dockerfile.different(self.internal_state):
+        if self.update_dockerfile_versions():
             self.update_files_on_github()
             self.save_state_to_s3(self.dockerfile.dump)
         return self.exit_code  # Making Lambda Service happy
