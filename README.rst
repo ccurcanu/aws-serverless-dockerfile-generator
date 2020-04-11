@@ -15,7 +15,7 @@ that contains handy cloud tools with latest versions.
 
 The function is triggered by CloudWatch Periodic trigger at each 5 minutes and
 checks if the  tools in the docker image have updates and regenerates the
-dockerfile if needed.s
+dockerfile if needed.
 
 
 Cloud Tools Docker image
@@ -25,16 +25,17 @@ The image is based on Ubuntu 18.04 containing almost everything that you need
 in order to do development in certain cloud environments.
 
 Tools that are automatically updated are:
-* Hashicorp Terraform, and Packer
+ * Hashicorp Terraform, and Packer
+ * Golang Go (Coming soon)
 
 
 Others includes:
-* Golang Go
-* OCI environment setup
-* Ansible
-* Build tools
-* Nice shell colouring
-* Others
+ * Golang Go
+ * OCI environment setup
+ * Ansible
+ * Build tools
+ * Nice shell colouring
+ * Others
 
 Dockerfile's repository can be found `<https://github.com/ccurcanu/docker-cloud-tools>`_
 and is used by a docker automated build here `<https://hub.docker.com/r/ccurcanu/cloud-tools>`_.
