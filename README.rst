@@ -25,15 +25,16 @@ The image is based on Ubuntu 18.04 containing almost everything that you need
 in order to do development in certain cloud environments.
 
 Tools that are automatically updated are:
-* Hashicorp Terraform, and Packer
-* Golang Go.
+- Hashicorp Terraform, and Packer
+
 
 Others includes:
-* OCI environment setup
-* Ansible
-* Build tools
-* Nice shell colouring
-* Others
+- Golang Go
+- OCI environment setup
+- Ansible
+- Build tools
+- Nice shell colouring
+- Others
 
 Dockerfile's repository can be found `https://github.com/ccurcanu/docker-cloud-tools`_
 and is used by a docker automated build here `https://hub.docker.com/r/ccurcanu/cloud-tools`_.
