@@ -50,7 +50,7 @@ class GitHubRepository:
 
         Return:
             Content of the file (str)."""
-        content = self.repo.get_file_contents(file_rel_path, ref)
+        content = self.repo.get_contents(file_rel_path, ref)
         return content.decoded_content.decode()
 
     def commit(self,

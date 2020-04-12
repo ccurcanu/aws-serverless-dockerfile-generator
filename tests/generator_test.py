@@ -11,7 +11,7 @@ import constants
 
 
 ENVIRON_PATCH = {
-    "dockerfile_gihub_repository": "something/docker-cloud-tools",
+    "dockerfile_github_repository": "something/docker-cloud-tools",
     "github_access_token": "<sometoken>",
     "internal_s3_bucket":  "<bucketname>"
 }
@@ -143,7 +143,7 @@ class DockerfileGeneratorLambdaTestCase(unittest.TestCase, TestsMixin):
         s3_bucket_mngr.return_value = mocks.FakeStorageManager("bucketname")
         github_repo.return_value = mocks.FakeGitHubRepository(
             "docker-cloud-tools")
-        self.assertEqual(generator.lambda_handler(None, None), 0)
+        self.assertEqual(generator.lambda_handler(), 0)
 
 
 if __name__ == '__main__':

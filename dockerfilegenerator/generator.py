@@ -111,5 +111,5 @@ class DockerfileGeneratorLambda(UtilsMixin):
         return self.exit_code  # Making Lambda Service happy
 
 
-def lambda_handler(event, context):
+def lambda_handler():
     return DockerfileGeneratorLambda().main()

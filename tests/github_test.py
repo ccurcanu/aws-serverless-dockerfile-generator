@@ -94,7 +94,7 @@ class GithubRepositoryMock:
     def get_releases(self):
         return self.releases
 
-    def get_file_contents(self, file_path, ref):
+    def get_contents(self, file_path, ref):
         return FileContentsMock(constants.TEST_GITHUB_GET_FILE_CONTENTS)
 
 
