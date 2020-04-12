@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import copy
 import botocore.exceptions
+import logging
 
 import dockerfilegenerator.lib.constants as constants
 import dockerfilegenerator.lib.exceptions as exceptions
@@ -10,6 +10,7 @@ import dockerfilegenerator.lib.jsonstore as jsonstore
 import dockerfilegenerator.lib.s3store as s3store
 import dockerfilegenerator.lib.github as github
 
+logger = logging.getLogger()
 
 TRACKED_TOOLS = {
     "terraform": versions.get_latest_hashicorp_terraform_version,
@@ -44,16 +45,22 @@ class UtilsMixin:
         for tool in self.tools_current_versions:
             # TODO: Refactor this method...
             if self.dockerfile.force_version(tool):
+                logger.info("Update versions: %s has force_version" % tool)
                 continue
             if tool == self.dockerfile.dockerfile_repo_name:
                 continue
             current_version = self.tools_current_versions[tool]
             next_version = self.tools_next_versions.get(tool, None)
             if next_version is None:
+                logger.info("Update versions: %s has no next version" % tool)
                 continue
             if current_version == next_version:
+                logger.info(
+                    "Update versions: %s has no changed version" % tool)
                 continue
             self.dockerfile.set_version(tool, next_version)
+            logger.info("Update versions: %s has next version %s" %
+                        (tool, next_version))
             dockerfile_changed = True
         if dockerfile_changed:
             self.dockerfile.set_next_version_dockerfile()
@@ -78,6 +85,7 @@ class DockerfileGeneratorLambda(UtilsMixin):
             internal_state = self.s3bucket.read_object(
                 constants.INTERNAL_STATE_FILE)
             if internal_state is None:
+                logger.info("Internal state: No state from S3")
                 internal_state = self.dockerfile.dump
                 self.save_state_to_s3(internal_state)
             self._internal_state = jsonstore.Store(internal_state)
@@ -95,10 +103,13 @@ class DockerfileGeneratorLambda(UtilsMixin):
                 **self.dockerfile.template_variables)),
             ("README.md", template_readme.format(
                 **self.dockerfile.template_variables))]
+        logger.info("Updating files on Github with message:\n\t%s" %
+                    commit_msg)
         self.dockerfile_repo.commit(commit_files, commit_msg)
 
     def save_state_to_s3(self, content):
         try:
+            logger.info("Saving state to S3")
             self.s3bucket.write_object(constants.INTERNAL_STATE_FILE, content)
         except (botocore.exceptions.ClientError, Exception) as e:
             raise exceptions.LambdaException(

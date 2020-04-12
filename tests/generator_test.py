@@ -130,7 +130,7 @@ class DockerfileGeneratorLambdaTestCase(unittest.TestCase, TestsMixin):
         with self.assertRaises(exceptions.LambdaException):
             self.generator.save_state_to_s3("something")
 
-    def test_main(self):
+    def test_main_with_changes(self):
         self.assertFalse(self.generator.dockerfile_repo.commit_called)
         self.assertIsNone(self.generator.s3bucket.file_name_written)
         self.assertEqual(self.generator.main(), 0)
@@ -139,10 +139,21 @@ class DockerfileGeneratorLambdaTestCase(unittest.TestCase, TestsMixin):
 
     @mock.patch(constants.S3STORE_MNGR_NAME)
     @mock.patch(constants.GITHUB_REPO_NAME)
+    def test_main_without_changes(self, github_repo, s3_bucket_mngr):
+        self._test_lambda_handler(
+            s3_bucket_mngr,
+            github_repo,
+            constants.INTERNAL_STATE_WITH_NO_FURTHER_CHANGES)
+
+    @mock.patch(constants.S3STORE_MNGR_NAME)
+    @mock.patch(constants.GITHUB_REPO_NAME)
     def test_lambda_handler(self, github_repo, s3_bucket_mngr):
-        s3_bucket_mngr.return_value = mocks.FakeStorageManager("bucketname")
-        github_repo.return_value = mocks.FakeGitHubRepository(
-            "docker-cloud-tools")
+        self._test_lambda_handler(s3_bucket_mngr, github_repo)
+
+    def _test_lambda_handler(self, mock1, mock2, dockerfile_content=None):
+        mock1.return_value = mocks.FakeStorageManager("bucketname")
+        mock2.return_value = mocks.FakeGitHubRepository(
+            "docker-cloud-tools", content=dockerfile_content)
         self.assertEqual(generator.lambda_handler(), 0)
 
 
