@@ -1,17 +1,18 @@
 import dockerfilegenerator.lib.constants as libconstants
 
-import botocore.exceptions
-
 import constants
 
 
 class FakeGitHubRepository:
 
-    def __init__(self, name):
+    def __init__(self, name, content=None):
         self.name = name
         self.commit_called = False
+        self.content_to_return = content
 
     def get_file_contents(self, file_path, **kwargs):
+        if self.content_to_return:
+            return self.content_to_return
         if file_path == libconstants.TEMPLATE_GITHUB_DOCKERFILE_PATH:
             return constants.TEMPLATE_DOCKERFILE_SAMPLE
         elif file_path == libconstants.TEMPLATE_GITHUB_README_PATH:
