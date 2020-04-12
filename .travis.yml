@@ -1,0 +1,20 @@
+language: python
+
+branches:
+  only:
+    - master
+
+matrix:
+  include:
+    - python: 3.6
+      env: TOXENV=py36
+
+install:
+  - pip install tox codecov
+  - pip install -e .
+
+script:
+  - tox
+
+after_success:
+  - codecov

@@ -1,9 +1,8 @@
-Dockerfile Serverless Generator (for cloud-tools Docker image)
-==============================================================
+Dockerfile Serverless Generator
+===============================
 
-
-.. contents:: **Table of Contents**
-    :backlinks: none
+.. image:: https://travis-ci.org/ccurcanu/aws-serverless-dockerfile-generator.svg?branch=master
+    :target: https://travis-ci.org/ccurcanu/aws-serverless-dockerfile-generator
 
 
 Description
