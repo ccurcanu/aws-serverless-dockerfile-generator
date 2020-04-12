@@ -1,14 +1,18 @@
+provider "aws" {
+  region  = var.region
+}
+
 
 resource "aws_s3_bucket" "this" {
-
-    bucket        = "${var.internal_store_s3_bucket_name}"
-    acl           = "private"
+    bucket = var.internal_store_s3_bucket_name
+    acl = "private"
     force_destroy = true
 
     versioning {
       enabled = true
     }
-    tags {
+
+    tags = {
         Name = "DockerfileGeneratorInternalStore-${var.internal_store_s3_bucket_name}"
         Env  = "Production"
         Serverless  = "True"
@@ -38,7 +42,7 @@ EOF
 
 resource "aws_iam_role_policy" "s3_bucket_policy" {
   name = "DockefileGeneratorS3BucketPolicyPolicy"
-  role = "${aws_iam_role.this.id}"
+  role = aws_iam_role.this.id
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -58,7 +62,7 @@ EOF
 
 resource "aws_iam_role_policy" "lambda_allow_cloudwatch_logs" {
   name = "DockerfileGeneratorCloudWatchLogsPolicy"
-  role = "${aws_iam_role.this.id}"
+  role = aws_iam_role.this.id
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -80,8 +84,8 @@ EOF
 
 resource "null_resource" "prepare-lambda-zip" {
 
-  triggers {
-    value = "${uuid()}"
+  triggers = {
+    value = uuid()
   }
 
   provisioner local-exec {
@@ -92,7 +96,7 @@ resource "null_resource" "prepare-lambda-zip" {
 
 
 data "archive_file" "lambda_zip" {
-    depends_on = ["null_resource.prepare-lambda-zip"]
+    depends_on =  [null_resource.prepare-lambda-zip]
     type = "zip"
     source_dir = "/tmp/dockerfilegenerator"
     output_path = "/tmp/dockerfilegenerator.zip"
@@ -100,13 +104,13 @@ data "archive_file" "lambda_zip" {
 
 
 resource "aws_lambda_function" "this" {
-    depends_on        = ["null_resource.prepare-lambda-zip", "aws_iam_role.this"]
+    depends_on        = [null_resource.prepare-lambda-zip, aws_iam_role.this]
     filename          = "/tmp/dockerfilegenerator.zip"
     function_name     = "DockerfileGenerator"
-    role              = "${aws_iam_role.this.arn}"
+    role              = aws_iam_role.this.arn
     handler           = "lambda_function.lambda_handler"
     runtime           = "python3.6"
-    source_code_hash  = "${data.archive_file.lambda_zip.output_base64sha256}"
+    source_code_hash  = data.archive_file.lambda_zip.output_base64sha256
     timeout           = 60
     environment {
        variables = {
@@ -119,27 +123,27 @@ resource "aws_lambda_function" "this" {
 
 
 resource "aws_cloudwatch_event_rule" "this" {
-  depends_on = ["aws_lambda_function.this"]
+  depends_on = [aws_lambda_function.this]
   description = "CloudWatch Events Periodic Trigger for Dockerfile Generator Lambda "
   name = "cloudwatch-event-schedule-rule"
   schedule_expression = "rate(5 minutes)"
-  is_enabled = "${var.enable_periodic_trigger}"
+  is_enabled = var.enable_periodic_trigger
 }
 
 
 resource "aws_cloudwatch_event_target" "this" {
-  depends_on = ["aws_lambda_function.this"]
-  rule = "${aws_cloudwatch_event_rule.this.name}"
+  depends_on = [aws_lambda_function.this]
+  rule = aws_cloudwatch_event_rule.this.name
   target_id = "InvokeLambda"
-  arn = "${aws_lambda_function.this.arn}"
+  arn = aws_lambda_function.this.arn
 }
 
 
 resource "aws_lambda_permission" "scheduled_lambda_cloudwatch_permission" {
-  depends_on = ["aws_lambda_function.this"]
+  depends_on = [aws_lambda_function.this]
   statement_id = "AllowExecutionFromCloudWatch"
   action = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.this.arn}"
+  function_name = aws_lambda_function.this.arn
+  source_arn = aws_cloudwatch_event_rule.this.arn
   principal = "events.amazonaws.com"
-  source_arn = "${aws_cloudwatch_event_rule.this.arn}"
 }
