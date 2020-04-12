@@ -53,7 +53,14 @@ folder. Commands to be run in order to provision the cloud infrastructure:
 
 .. code-block:: bash
 
-    $ terraform init     # Initialize project
-    $ terraform plan     # setup internal state
-    $ terraform apply    # Deploy the infrastructure
-    $ terraform destroy  # Only if you want to destroy the infra and cleanup
+    $ terraform init                   # Initialize project
+    $ terraform plan                   # setup internal state
+    $ terraform apply -auto-approve    # Deploy the infrastructure
+    $ terraform destroy                # Only if you want to destroy the infra and cleanup
+
+Testing the function via CLI:
+
+.. code-block:: bash
+
+    $ aws lambda invoke --region eu-west-2 --function-name DockerfileGenerator \
+  out --log-type Tail --query 'LogResult' --output text |  base64 -d

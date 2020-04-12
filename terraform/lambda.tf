@@ -111,7 +111,8 @@ resource "aws_lambda_function" "this" {
     handler           = "lambda_function.lambda_handler"
     runtime           = "python3.6"
     source_code_hash  = data.archive_file.lambda_zip.output_base64sha256
-    timeout           = 60
+    timeout           = 900
+    memory_size       = 3008
     environment {
        variables = {
          github_access_token = "${var.github_access_token}"

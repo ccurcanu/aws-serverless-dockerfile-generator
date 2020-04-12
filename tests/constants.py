@@ -145,3 +145,25 @@ JSON_CONTENT_TESTING_UTILS_NO_UPDATES = """
 
 TEMPLATE_DOCKERFILE_SAMPLE = "Nothing else yet"
 TEMPLATE_README_SAMPLE = "Nothong else yet"
+
+INTERNAL_STATE_WITH_NO_FURTHER_CHANGES = """
+{
+    "terraform": {
+        "github_repo": "hashicorp/terraform",
+        "version": "v0.11.9",
+        "template_key": "TERRAFORM_VERSION",
+        "remove_prefix": "v",
+        "force_version": "true"
+    },
+    "packer": {
+        "github_repo": "hashicorp/packer",
+        "version": "v1.0.0",
+        "template_key": "PACKER_VERSION",
+        "remove_prefix": "v"
+    },
+    "docker-cloud-tools": {
+        "github_repo": "ccurcanu/docker-cloud-tools",
+        "version": "1",
+        "template_key": "DOCKERFILE_VERSION"
+    }
+}"""
