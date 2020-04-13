@@ -23,3 +23,4 @@ TEMPLATE_GITHUB_README_PATH = "templates/README.md"
 
 TF_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/terraform"
 PK_LATEST_URL = "https://checkpoint-api.hashicorp.com/v1/check/packer"
+GO_LATEST_URL = "https://golang.org/VERSION?m=text"
