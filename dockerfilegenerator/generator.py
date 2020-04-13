@@ -15,6 +15,7 @@ logger = logging.getLogger()
 TRACKED_TOOLS = {
     "terraform": versions.get_latest_hashicorp_terraform_version,
     "packer": versions.get_latest_hashicorp_packer_version,
+    "go": versions.get_latest_golango_go_version
 }
 
 

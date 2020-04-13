@@ -43,6 +43,13 @@ class VersionsTestCase(unittest.TestCase):
         with self.assertRaises(Exception):
             versions.get_hashicorp_api_item("someurl", "someitem")
 
+    @mock.patch("urllib3.PoolManager")
+    def test_get_latest_golang_go_version(self, manager):
+        manager.return_value = RequestPoolManager(HttpResponseMock(
+            bytes(constants.EXPECTED_GOLANG_VERSION, encoding="utf-8")))
+        version = versions.get_latest_golango_go_version()
+        self.assertEqual(version, constants.EXPECTED_GOLANG_VERSION)
+
 
 class RequestPoolManager:
 
@@ -58,6 +65,9 @@ class HttpResponseMock:
     def __init__(self, data, status=200):
         self.status = status
         self.data = data
+
+    def close(self):
+        pass
 
 
 if __name__ == '__main__':
